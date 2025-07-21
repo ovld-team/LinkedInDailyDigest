@@ -47,22 +47,32 @@ You'll need to implement OAuth flow or use LinkedIn's test token:
 Implement OAuth 2.0 flow in your application.
 
 #### Get Organization URN (for company posting)
-1. Use this API call with your access token:
+
+**Method 1: From LinkedIn Company Page URL**
+1. Go to your company's LinkedIn page
+2. Look at the URL: `https://www.linkedin.com/company/your-company-name/`
+3. View page source (Ctrl+U) and search for `"organizationId"`
+4. You'll find: `"organizationId":"12345678"`
+5. Your URN is: `urn:li:organization:12345678`
+
+**Method 2: Using LinkedIn API (requires admin permissions)**
 ```bash
-curl -X GET 'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee' \
+# First, check what organizations you can access
+curl -X GET 'https://api.linkedin.com/v2/organizations?q=administeredOrganization' \
 -H 'Authorization: Bearer YOUR_ACCESS_TOKEN'
 ```
 
-2. Find your organization's URN in the response:
-```json
-{
-  "elements": [
-    {
-      "organizationalTarget": "urn:li:organization:12345678"
-    }
-  ]
-}
+**Method 3: Using People API (alternative)**
+```bash
+# Get your profile first, then check for organization roles
+curl -X GET 'https://api.linkedin.com/v2/people/~:(id,firstName,lastName)' \
+-H 'Authorization: Bearer YOUR_ACCESS_TOKEN'
 ```
+
+**Method 4: Manual lookup from Company Page**
+1. Go to your LinkedIn company page
+2. Click "Edit page" (if you're an admin)
+3. The organization ID will be in the URL or page data
 
 ### Step 5: Add to Environment Variables
 
@@ -131,10 +141,12 @@ response = requests.post(
 - Implement refresh token flow for production
 - Generate new token from Developer Portal
 
-### "Insufficient permissions"
+### "Insufficient permissions" or "ACCESS_DENIED"
 - Ensure your app has "Share on LinkedIn" product
-- Verify company page admin permissions
+- Verify company page admin permissions  
 - Check organization URN is correct
+- **For organization URN issues**: Use Method 1 (page source) instead of API
+- Your app may not have "Organization Management" permissions
 
 ### "Rate limit exceeded"
 - LinkedIn allows ~100 posts per day
