@@ -585,22 +585,30 @@ class LinkedInAPI:
         """Create a post on LinkedIn using the API."""
         try:
             if self.org_urn:
-                # Use Posts API for organization posting (newer API)
+                # FORCE organization posting - user specifically wants company page
+                logging.info(f"🏢 Posting to organization page: {self.org_urn}")
                 return self._create_organization_post(content)
             else:
-                # Use UGC Posts API for personal posting
-                return self._create_personal_post(content)
+                logging.error("❌ No organization URN provided but organization posting was requested")
+                logging.error("🔧 Add LINKEDIN_ORG_URN to your .env file to post to company page")
+                return False
                 
         except Exception as e:
             logging.error(f"Failed to create LinkedIn post: {e}")
             return False
     
     def _create_organization_post(self, content):
-        """Create organization post using Posts API."""
+        """Create organization post using the correct API structure."""
+        # First try the UGC Posts API (most reliable for organizations)
+        success = self._create_organization_ugc_post(content)
+        if success:
+            return True
+            
+        # If UGC fails, try the newer Posts API
         try:
             headers = {
                 'Authorization': f'Bearer {self.access_token}',
-                'LinkedIn-Version': '202410',  # Updated version
+                'LinkedIn-Version': '202410',
                 'X-Restli-Protocol-Version': '2.0.0',
                 'Content-Type': 'application/json'
             }
@@ -618,7 +626,6 @@ class LinkedInAPI:
                 'isReshareDisabledByAuthor': False
             }
             
-            # Use the Posts API endpoint for organizations
             response = requests.post(
                 'https://api.linkedin.com/rest/posts',
                 headers=headers,
@@ -631,23 +638,22 @@ class LinkedInAPI:
                 return True
             else:
                 logging.error(f"Organization posting failed: {response.status_code} - {response.text}")
-                # Try alternative UGC API for organization
-                return self._create_organization_ugc_post(content)
+                return False
                 
         except Exception as e:
             logging.error(f"Organization post creation failed: {e}")
             return False
     
     def _create_organization_ugc_post(self, content):
-        """Fallback: Create organization post using UGC Posts API."""
+        """Create organization post using UGC Posts API (most reliable method)."""
         try:
             headers = {
                 'Authorization': f'Bearer {self.access_token}',
-                'LinkedIn-Version': '202410',
                 'X-Restli-Protocol-Version': '2.0.0',
                 'Content-Type': 'application/json'
             }
             
+            # Use the exact structure from LinkedIn documentation
             data = {
                 'author': self.org_urn,
                 'lifecycleState': 'PUBLISHED',
@@ -664,6 +670,8 @@ class LinkedInAPI:
                 }
             }
             
+            logging.info(f"Attempting organization post with URN: {self.org_urn}")
+            
             response = requests.post(
                 'https://api.linkedin.com/v2/ugcPosts',
                 headers=headers,
@@ -672,65 +680,30 @@ class LinkedInAPI:
             
             if response.status_code in [200, 201]:
                 post_id = response.headers.get('X-RestLi-Id')
-                logging.info(f"Organization UGC post created successfully. Post ID: {post_id}")
+                logging.info(f"✅ Organization post created successfully! Post ID: {post_id}")
                 return True
             else:
-                logging.error(f"Organization UGC posting failed: {response.status_code} - {response.text}")
+                logging.error(f"❌ Organization posting failed: {response.status_code}")
+                logging.error(f"Response: {response.text}")
+                
+                # Log specific error guidance
+                if response.status_code == 400:
+                    logging.error("🔧 400 Error: You need Community Management API access for organization posting")
+                elif response.status_code == 403:
+                    logging.error("🔧 403 Error: Your access token lacks w_organization_social permission")
+                    logging.error("🔧 Or you're not an ADMINISTRATOR on this company page")
+                
                 return False
                 
         except Exception as e:
-            logging.error(f"Organization UGC post creation failed: {e}")
+            logging.error(f"Organization post creation failed: {e}")
             return False
     
     def _create_personal_post(self, content):
         """Create personal post using UGC Posts API."""
-        try:
-            # Get person URN first
-            person_urn = self._get_person_urn()
-            if not person_urn:
-                logging.error("Could not get person URN for personal posting")
-                return False
-            
-            headers = {
-                'Authorization': f'Bearer {self.access_token}',
-                'LinkedIn-Version': '202410',
-                'X-Restli-Protocol-Version': '2.0.0',
-                'Content-Type': 'application/json'
-            }
-            
-            data = {
-                'author': person_urn,
-                'lifecycleState': 'PUBLISHED',
-                'specificContent': {
-                    'com.linkedin.ugc.ShareContent': {
-                        'shareCommentary': {
-                            'text': content
-                        },
-                        'shareMediaCategory': 'NONE'
-                    }
-                },
-                'visibility': {
-                    'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
-                }
-            }
-            
-            response = requests.post(
-                'https://api.linkedin.com/v2/ugcPosts',
-                headers=headers,
-                json=data
-            )
-            
-            if response.status_code in [200, 201]:
-                post_id = response.headers.get('X-RestLi-Id')
-                logging.info(f"Personal post created successfully. Post ID: {post_id}")
-                return True
-            else:
-                logging.error(f"Personal posting failed: {response.status_code} - {response.text}")
-                return False
-                
-        except Exception as e:
-            logging.error(f"Personal post creation failed: {e}")
-            return False
+        logging.warning("⚠️ PERSONAL POSTING DISABLED - User wants organization posting only")
+        logging.warning("🔧 To enable personal posting, remove LINKEDIN_ORG_URN from .env")
+        return False
     
     def _get_person_urn(self):
         """Get the person URN for personal posting."""

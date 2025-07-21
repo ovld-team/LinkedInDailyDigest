@@ -21,9 +21,7 @@ Fill out the application form:
 ### Step 3: Configure App Permissions
 In your app dashboard, go to the **Products** tab and request:
 
-- **Share on LinkedIn** - Required for personal posting
 - **Community Management API** - Required for organization/company page posting
-- **Sign In with LinkedIn** - Required for authentication
 
 > ⚠️ **Important for Company Posting**: 
 > - You need **Community Management API** access for organization posting
