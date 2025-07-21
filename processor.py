@@ -321,14 +321,11 @@ class CyberSecurityProcessor:
         return combined_cves
 
     def clean_ai_content(self, text):
-        """
-        Comprehensive cleaning of AI-generated content to remove hidden characters,
-        markdown, and other unwanted formatting.
-        """
+        """Clean AI-generated content while preserving emojis and good formatting."""
         if not text:
             return ""
         
-        # Remove hidden characters and normalize Unicode
+        # Remove hidden characters and normalize Unicode (but preserve emojis)
         text = unicodedata.normalize('NFKD', text)
         
         # Remove zero-width characters and other invisible characters
@@ -343,43 +340,56 @@ class CyberSecurityProcessor:
         for char in invisible_chars:
             text = text.replace(char, '')
         
-        # Remove markdown formatting but keep hashtags
+        # Remove only basic markdown formatting but keep structural elements
         patterns = [
-            r"(\*{1,2})(.*?)\1",  # Bold and italics
-            r"\[(.*?)\]\((.*?)\)",  # Links -> keep text, remove URL
+            r"(\*{3,})(.*?)\1",  # Remove triple+ asterisks
+            r"`{3,}[^`]*`{3,}",  # Remove code blocks
             r"`(.*?)`",  # Inline code
-            r"(\n\s*)- (.*)",  # Unordered lists (with `-`)
-            r"(\n\s*)\* (.*)",  # Unordered lists (with `*`)
-            r"(\n\s*)[0-9]+\. (.*)",  # Ordered lists
-            r"(>+)(.*)",  # Blockquotes
-            r"(---|\*\*\*)",  # Horizontal rules
-            r"!\[(.*?)\]\((.*?)\)",  # Images
+            r"(#{1,6})\s*",  # Remove markdown headers
         ]
 
-        # Replace patterns while preserving content
+        # Apply basic markdown removal
         for pattern in patterns:
-            if pattern == r"\[(.*?)\]\((.*?)\)":  # Special handling for links
-                text = re.sub(pattern, r"\1", text)
-            elif pattern in [r"(\n\s*)- (.*)", r"(\n\s*)\* (.*)", r"(\n\s*)[0-9]+\. (.*)"]:
-                text = re.sub(pattern, r"\1\2", text)
-            elif pattern == r"(\*{1,2})(.*?)\1":  # Bold and italics
-                text = re.sub(pattern, r"\2", text)
-            elif pattern == r"`(.*?)`":  # Inline code
-                text = re.sub(pattern, r"\1", text)
-            elif pattern == r"(>+)(.*)":  # Blockquotes
-                text = re.sub(pattern, r"\2", text)
-            elif pattern == r"!\[(.*?)\]\((.*?)\)":  # Images
+            if pattern == r"`(.*?)`":  # Inline code - keep content
                 text = re.sub(pattern, r"\1", text)
             else:
-                # For patterns with only one group or no specific handling
                 text = re.sub(pattern, "", text)
 
-        # Clean up excessive whitespace
-        text = re.sub(r'\n{3,}', '\n\n', text)  # Max 2 consecutive newlines
-        text = re.sub(r' {2,}', ' ', text)  # Remove multiple spaces
+        # Clean up excessive whitespace but preserve intentional line breaks
+        text = re.sub(r'\n{4,}', '\n\n\n', text)  # Max 3 consecutive newlines
+        text = re.sub(r'[ \t]+', ' ', text)  # Remove multiple spaces/tabs
+        text = re.sub(r'^\s+|\s+$', '', text, flags=re.MULTILINE)  # Trim lines
         text = text.strip()
         
         return text
+
+    def add_reference_links(self, content, cves_used=None, topic=""):
+        """Add reference links to the content."""
+        references = []
+        
+        # Add CVE references
+        if cves_used:
+            for cve_id in cves_used:
+                references.append(f"🔗 {cve_id}: https://nvd.nist.gov/vuln/detail/{cve_id}")
+        
+        # Add relevant cybersecurity resources based on topic
+        topic_lower = topic.lower()
+        if "ransomware" in topic_lower:
+            references.append("🔗 CISA Ransomware Guide: https://cisa.gov/stopransomware")
+        elif "zero-day" in topic_lower or "exploit" in topic_lower:
+            references.append("🔗 MITRE ATT&CK: https://attack.mitre.org")
+        elif "cloud" in topic_lower or "aws" in topic_lower or "azure" in topic_lower:
+            references.append("🔗 Cloud Security Alliance: https://cloudsecurityalliance.org")
+        elif "incident" in topic_lower or "response" in topic_lower:
+            references.append("🔗 NIST IR Framework: https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final")
+        else:
+            references.append("🔗 NIST Cybersecurity Framework: https://nist.gov/cyberframework")
+        
+        # Add references if we have any
+        if references and len(content) < 1100:  # Only add if we have space
+            content += "\n\n📚 References:\n" + "\n".join(references[:2])  # Max 2 references
+        
+        return content
 
     def generate_cybersecurity_content(self, topic, include_cve=True):
         """Generates cybersecurity-focused post content using Gemini AI."""
@@ -395,52 +405,76 @@ class CyberSecurityProcessor:
             if include_cve:
                 latest_cves = self.get_combined_cve_data(reddit_limit=5, nist_limit=3)
                 if latest_cves:
-                    cve_context = "\n\nLatest Critical Vulnerabilities:\n"
+                    cve_context = "\n\nCRITICAL VULNERABILITIES TO REFERENCE:\n"
                     for cve in latest_cves[:3]:  # Use max 3 CVEs per post
                         source = "Community Analysis" if cve['source'] == 'reddit' else "Official NIST"
                         post_date = cve.get('post_date', 'Recent')
-                        cve_context += f"• {cve['id']} (CVSS: {cve['cvss_score']}) - {source} ({post_date})\n  Impact: {cve['description']}\n"
+                        severity = "🔥 CRITICAL" if float(cve['cvss_score']) >= 9.0 else "⚠️ HIGH" if float(cve['cvss_score']) >= 7.0 else "📊 MEDIUM"
+                        cve_context += f"{severity} {cve['id']} (CVSS: {cve['cvss_score']}) - {source} ({post_date})\n  Impact: {cve['description']}\n\n"
                         used_cves.append(cve['id'])
 
             current_date = datetime.now().strftime('%B %d, %Y')
             
-            prompt = f"""You are a cybersecurity expert writing for a company LinkedIn page. Create an engaging daily security briefing post.
+            prompt = f"""You are a cybersecurity expert writing for a company LinkedIn page. Create an engaging, visually appealing daily security briefing post.
 
 TOPIC: {topic}
 DATE: {current_date}
 
-REQUIREMENTS:
-- Write like a human cybersecurity professional, not an AI
-- 900-1200 characters (LinkedIn optimal length)
+CONTENT REQUIREMENTS:
+- 800-1000 characters (leaving room for references)
 - Professional but conversational tone
+- Include relevant emojis (2-4 total, strategically placed)
+- Use proper line breaks for readability
 - Include specific actionable advice
-- Start with a compelling hook or current event reference
-- Use natural transitions, not bullet points
+- Start with a compelling hook
 - Add relevant hashtags at the end
-- Avoid buzzwords and corporate speak
-- Make it feel urgent but not alarmist
+
+FORMATTING REQUIREMENTS:
+- Use emojis to highlight key points (🔥 for urgent, ⚠️ for warnings, 💡 for tips, 🎯 for actions)
+- Use line breaks to separate sections naturally
+- NO markdown formatting (**, *, [], etc.)
+- Write in flowing, natural sentences with proper spacing
 
 {cve_context if cve_context else ""}
 
 STRUCTURE:
-1. Opening hook (current threat landscape/news)
-2. Main insight about the topic
-3. Practical business impact
-4. 1-2 specific action items
-5. Closing thought that encourages engagement
-6. Relevant hashtags
+🔥 Opening hook with current threat landscape
+[Blank line]
+Main insight about the topic with specific data/examples
+[Blank line] 
+💡 Practical business impact and what it means
+[Blank line]
+🎯 1-2 specific action items for security teams
+[Blank line]
+Closing thought that encourages engagement
+[Blank line]
+#hashtags #cybersecurity #infosec
 
-Write as if you're sharing insider knowledge with fellow security professionals. Use "we" and "our" to create community. Include specific numbers, timeframes, or examples when possible.
+TONE EXAMPLES:
+"This week's threat intelligence reveals..." 
+"Security teams are reporting a 40% increase in..."
+"Based on our latest incident data..."
+"URGENT: New campaign targeting..."
 
-Example tone: "This week's threat intelligence shows..." or "Security teams are reporting..." or "Based on recent incident data..."
+EMOJI USAGE:
+- 🔥 for hot/urgent threats
+- ⚠️ for warnings and alerts  
+- 💡 for insights and tips
+- 🎯 for action items
+- 📊 for statistics
+- 🛡️ for defense/protection
+- 🔍 for investigation/analysis
 
-DO NOT use markdown, bullet points, or corporate jargon. Write in flowing, natural sentences."""
+Remember: Write like a human expert sharing critical insights with peers. Include specific numbers, timeframes, and real-world examples. Keep it urgent but professional."""
 
             response = client.generate_content(prompt)
 
             if response.text:
                 # Clean the AI-generated content
                 cleaned_content = self.clean_ai_content(response.text)
+                
+                # Add reference links if space allows
+                cleaned_content = self.add_reference_links(cleaned_content, used_cves, topic)
                 
                 # Check for content duplication
                 if self.cve_tracker.is_content_duplicate(cleaned_content):

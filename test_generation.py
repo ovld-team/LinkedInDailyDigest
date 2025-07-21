@@ -319,37 +319,57 @@ def generate_cybersecurity_content(topic, cves=None):
 
         current_date = datetime.now().strftime('%B %d, %Y')
         
-        prompt = f"""You are a cybersecurity expert writing for a company LinkedIn page. Create an engaging daily security briefing post.
+        prompt = f"""You are a cybersecurity expert writing for a company LinkedIn page. Create an engaging, visually appealing daily security briefing post.
 
 TOPIC: {topic}
 DATE: {current_date}
 
-REQUIREMENTS:
-- Write like a human cybersecurity professional, not an AI
-- 900-1200 characters (LinkedIn optimal length)
+CONTENT REQUIREMENTS:
+- 800-1000 characters (leaving room for references)
 - Professional but conversational tone
+- Include relevant emojis (2-4 total, strategically placed)
+- Use proper line breaks for readability
 - Include specific actionable advice
-- Start with a compelling hook or current event reference
-- Use natural transitions, not bullet points
+- Start with a compelling hook
 - Add relevant hashtags at the end
-- Avoid buzzwords and corporate speak
-- Make it feel urgent but not alarmist
+
+FORMATTING REQUIREMENTS:
+- Use emojis to highlight key points (🔥 for urgent, ⚠️ for warnings, 💡 for tips, 🎯 for actions)
+- Use line breaks to separate sections naturally
+- NO markdown formatting (**, *, [], etc.)
+- Write in flowing, natural sentences with proper spacing
 
 {cve_context if cve_context else ""}
 
 STRUCTURE:
-1. Opening hook (current threat landscape/news)
-2. Main insight about the topic
-3. Practical business impact
-4. 1-2 specific action items
-5. Closing thought that encourages engagement
-6. Relevant hashtags
+🔥 Opening hook with current threat landscape
+[Blank line]
+Main insight about the topic with specific data/examples
+[Blank line] 
+💡 Practical business impact and what it means
+[Blank line]
+🎯 1-2 specific action items for security teams
+[Blank line]
+Closing thought that encourages engagement
+[Blank line]
+#hashtags #cybersecurity #infosec
 
-Write as if you're sharing insider knowledge with fellow security professionals. Use "we" and "our" to create community. Include specific numbers, timeframes, or examples when possible.
+TONE EXAMPLES:
+"This week's threat intelligence reveals..." 
+"Security teams are reporting a 40% increase in..."
+"Based on our latest incident data..."
+"URGENT: New campaign targeting..."
 
-Example tone: "This week's threat intelligence shows..." or "Security teams are reporting..." or "Based on recent incident data..."
+EMOJI USAGE:
+- 🔥 for hot/urgent threats
+- ⚠️ for warnings and alerts  
+- 💡 for insights and tips
+- 🎯 for action items
+- 📊 for statistics
+- 🛡️ for defense/protection
+- 🔍 for investigation/analysis
 
-DO NOT use markdown, bullet points, or corporate jargon. Write in flowing, natural sentences."""
+Remember: Write like a human expert sharing critical insights with peers. Include specific numbers, timeframes, and real-world examples. Keep it urgent but professional."""
 
         response = client.generate_content(prompt)
 
@@ -407,6 +427,10 @@ def main():
         
         # Generate content
         content = generate_cybersecurity_content(test_topic, combined_cves)
+        
+        # Add reference links (simulating what processor.py does)
+        used_cves = [cve['id'] for cve in combined_cves[:3]] if combined_cves else []
+        content = add_reference_links(content, used_cves, test_topic)
         
         # Display final result
         print("📄 FINAL LINKEDIN POST (via API):")
