@@ -27,11 +27,9 @@ class ContentScheduler:
     
     def __init__(self):
         self.posting_times = [
-            "09:00",  # Morning business hours (threat briefing)
-            "13:00",  # Lunch time (community insights)
-            "17:00",  # End of day (security summary)
+            "09:00"   # Morning business hours (daily security briefing)
         ]
-        self.max_daily_posts = 3
+        self.max_daily_posts = 1
         self.daily_post_count = 0
         self.last_post_date = None
         
@@ -79,12 +77,11 @@ class ContentScheduler:
     
     def schedule_posts(self):
         """Set up the posting schedule."""
-        logging.info("Setting up LinkedIn posting schedule...")
+        logging.info("Setting up LinkedIn morning posting schedule...")
         
-        # Schedule posts at different times
-        for posting_time in self.posting_times:
-            schedule.every().day.at(posting_time).do(self.post_cybersecurity_content)
-            logging.info(f"Scheduled post for {posting_time} daily")
+        # Schedule single morning post
+        schedule.every().day.at(self.posting_times[0]).do(self.post_cybersecurity_content)
+        logging.info(f"📅 Scheduled daily morning briefing at {self.posting_times[0]}")
         
         # Schedule daily counter reset at midnight
         schedule.every().day.at("00:01").do(self.reset_daily_counter)
@@ -99,7 +96,7 @@ class ContentScheduler:
         org_urn = os.getenv("LINKEDIN_ORG_URN", "")
         logging.info(f"Posting to: {'Company page' if org_urn else 'Personal profile'}")
         logging.info(f"Daily post limit: {self.max_daily_posts}")
-        logging.info(f"Posting times: {', '.join(self.posting_times)}")
+        logging.info(f"Morning posting time: {self.posting_times[0]} (daily security briefing)")
         
         while True:
             try:

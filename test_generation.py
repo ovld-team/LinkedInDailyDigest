@@ -295,6 +295,34 @@ def clean_ai_content(text):
     
     return text
 
+def add_reference_links(content, cves_used=None, topic=""):
+    """Add reference links to the content."""
+    references = []
+    
+    # Add CVE references
+    if cves_used:
+        for cve_id in cves_used:
+            references.append(f"🔗 {cve_id}: https://nvd.nist.gov/vuln/detail/{cve_id}")
+    
+    # Add relevant cybersecurity resources based on topic
+    topic_lower = topic.lower()
+    if "ransomware" in topic_lower:
+        references.append("🔗 CISA Ransomware Guide: https://cisa.gov/stopransomware")
+    elif "zero-day" in topic_lower or "exploit" in topic_lower:
+        references.append("🔗 MITRE ATT&CK: https://attack.mitre.org")
+    elif "cloud" in topic_lower or "aws" in topic_lower or "azure" in topic_lower:
+        references.append("🔗 Cloud Security Alliance: https://cloudsecurityalliance.org")
+    elif "incident" in topic_lower or "response" in topic_lower:
+        references.append("🔗 NIST IR Framework: https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final")
+    else:
+        references.append("🔗 NIST Cybersecurity Framework: https://nist.gov/cyberframework")
+    
+    # Add references if we have any
+    if references and len(content) < 1100:  # Only add if we have space
+        content += "\n\n📚 References:\n" + "\n".join(references[:2])  # Max 2 references
+    
+    return content
+
 def generate_cybersecurity_content(topic, cves=None):
     """Generate cybersecurity content using Gemini AI with enhanced prompting."""
     print(f"🤖 Generating content for topic: {topic}")

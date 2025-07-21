@@ -87,7 +87,7 @@ python processor.py
 
 ### Daily Automated Posting
 ```bash
-# Run daily scheduler (posts 3x per day at optimal times)
+# Run daily scheduler (posts once per day at 9:00 AM)
 python scheduler.py
 
 # Test single scheduled post

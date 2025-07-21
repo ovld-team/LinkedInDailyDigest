@@ -86,7 +86,7 @@ python processor.py  # Post once
 
 ### Option 2: Daily Automation
 ```bash
-python scheduler.py  # Posts 3x daily at optimal times
+python scheduler.py  # Posts 1x daily at 9:00 AM
 ```
 
 ### Option 3: Custom Schedule
@@ -117,7 +117,7 @@ REDDIT_USER_AGENT=linkedin_cve_bot/1.0
 
 ### Content Customization
 - **Topics**: Edit `Topics.txt` to add your preferred cybersecurity topics
-- **Posting Frequency**: Modify `scheduler.py` posting times
+- **Posting Time**: Modify morning posting time in `scheduler.py` (default: 9:00 AM)
 - **CVE Sources**: Configure Reddit vs NIST preferences in `processor.py`
 
 ## 🧪 Testing Your Setup
