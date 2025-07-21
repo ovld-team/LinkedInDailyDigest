@@ -62,3 +62,5 @@ venv/
 
 linkedlnbot.sh
 .txt
+
+cve_tracking.json

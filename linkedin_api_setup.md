@@ -21,10 +21,14 @@ Fill out the application form:
 ### Step 3: Configure App Permissions
 In your app dashboard, go to the **Products** tab and request:
 
-- **Share on LinkedIn** - Required for posting
+- **Share on LinkedIn** - Required for personal posting
+- **Community Management API** - Required for organization/company page posting
 - **Sign In with LinkedIn** - Required for authentication
 
-> ⚠️ **Note**: You may need to verify your app for company page posting
+> ⚠️ **Important for Company Posting**: 
+> - You need **Community Management API** access for organization posting
+> - Your LinkedIn account must be an **ADMINISTRATOR** or **DIRECT_SPONSORED_CONTENT_POSTER** on the company page
+> - The access token must include `w_organization_social` permission scope
 
 ### Step 4: Get Your Credentials
 
@@ -142,11 +146,18 @@ response = requests.post(
 - Generate new token from Developer Portal
 
 ### "Insufficient permissions" or "ACCESS_DENIED"
-- Ensure your app has "Share on LinkedIn" product
-- Verify company page admin permissions  
-- Check organization URN is correct
+- **For personal posting**: Ensure your app has "Share on LinkedIn" product
+- **For organization posting**: Ensure your app has "Community Management API" product
+- Verify you are an ADMINISTRATOR on the company page
+- Check organization URN format: `urn:li:organization:12345678`
 - **For organization URN issues**: Use Method 1 (page source) instead of API
-- Your app may not have "Organization Management" permissions
+- Your access token must include `w_organization_social` scope for company posting
+
+### "Organization permissions must be used when using organization as author"
+- This means you need **Community Management API** access
+- Your LinkedIn account must be an **ADMINISTRATOR** or **DIRECT_SPONSORED_CONTENT_POSTER** on the company page
+- Apply for Community Management API through LinkedIn Developer Portal
+- The access token must be generated with organization permissions
 
 ### "Rate limit exceeded"
 - LinkedIn allows ~100 posts per day

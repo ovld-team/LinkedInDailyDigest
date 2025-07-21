@@ -575,7 +575,6 @@ class LinkedInAPI:
     def __init__(self):
         self.access_token = os.getenv("LINKEDIN_ACCESS_TOKEN")
         self.org_urn = os.getenv("LINKEDIN_ORG_URN")
-        self.api_url = "https://api.linkedin.com/rest/posts"
         
         if not self.access_token:
             logging.warning("LinkedIn access token not found. API posting will fail.")
@@ -585,18 +584,29 @@ class LinkedInAPI:
     def create_post(self, content):
         """Create a post on LinkedIn using the API."""
         try:
+            if self.org_urn:
+                # Use Posts API for organization posting (newer API)
+                return self._create_organization_post(content)
+            else:
+                # Use UGC Posts API for personal posting
+                return self._create_personal_post(content)
+                
+        except Exception as e:
+            logging.error(f"Failed to create LinkedIn post: {e}")
+            return False
+    
+    def _create_organization_post(self, content):
+        """Create organization post using Posts API."""
+        try:
             headers = {
                 'Authorization': f'Bearer {self.access_token}',
-                'LinkedIn-Version': '202506',
+                'LinkedIn-Version': '202410',  # Updated version
                 'X-Restli-Protocol-Version': '2.0.0',
                 'Content-Type': 'application/json'
             }
             
-            # Use organization URN if available, otherwise post to personal profile
-            author = self.org_urn if self.org_urn else 'urn:li:person:' + self._get_person_id()
-            
             data = {
-                'author': author,
+                'author': self.org_urn,
                 'commentary': content,
                 'visibility': 'PUBLIC',
                 'distribution': {
@@ -608,39 +618,144 @@ class LinkedInAPI:
                 'isReshareDisabledByAuthor': False
             }
             
-            response = requests.post(self.api_url, headers=headers, json=data)
+            # Use the Posts API endpoint for organizations
+            response = requests.post(
+                'https://api.linkedin.com/rest/posts',
+                headers=headers,
+                json=data
+            )
             
             if response.status_code in [200, 201]:
                 post_id = response.headers.get('x-restli-id')
-                logging.info(f"LinkedIn post created successfully. Post ID: {post_id}")
+                logging.info(f"Organization post created successfully. Post ID: {post_id}")
                 return True
             else:
-                logging.error(f"LinkedIn API error: {response.status_code} - {response.text}")
-                return False
+                logging.error(f"Organization posting failed: {response.status_code} - {response.text}")
+                # Try alternative UGC API for organization
+                return self._create_organization_ugc_post(content)
                 
         except Exception as e:
-            logging.error(f"Failed to create LinkedIn post: {e}")
+            logging.error(f"Organization post creation failed: {e}")
             return False
     
-    def _get_person_id(self):
-        """Get the person ID for personal posting (if no org URN provided)."""
+    def _create_organization_ugc_post(self, content):
+        """Fallback: Create organization post using UGC Posts API."""
         try:
             headers = {
                 'Authorization': f'Bearer {self.access_token}',
-                'LinkedIn-Version': '202506'
+                'LinkedIn-Version': '202410',
+                'X-Restli-Protocol-Version': '2.0.0',
+                'Content-Type': 'application/json'
+            }
+            
+            data = {
+                'author': self.org_urn,
+                'lifecycleState': 'PUBLISHED',
+                'specificContent': {
+                    'com.linkedin.ugc.ShareContent': {
+                        'shareCommentary': {
+                            'text': content
+                        },
+                        'shareMediaCategory': 'NONE'
+                    }
+                },
+                'visibility': {
+                    'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+                }
+            }
+            
+            response = requests.post(
+                'https://api.linkedin.com/v2/ugcPosts',
+                headers=headers,
+                json=data
+            )
+            
+            if response.status_code in [200, 201]:
+                post_id = response.headers.get('X-RestLi-Id')
+                logging.info(f"Organization UGC post created successfully. Post ID: {post_id}")
+                return True
+            else:
+                logging.error(f"Organization UGC posting failed: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            logging.error(f"Organization UGC post creation failed: {e}")
+            return False
+    
+    def _create_personal_post(self, content):
+        """Create personal post using UGC Posts API."""
+        try:
+            # Get person URN first
+            person_urn = self._get_person_urn()
+            if not person_urn:
+                logging.error("Could not get person URN for personal posting")
+                return False
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'LinkedIn-Version': '202410',
+                'X-Restli-Protocol-Version': '2.0.0',
+                'Content-Type': 'application/json'
+            }
+            
+            data = {
+                'author': person_urn,
+                'lifecycleState': 'PUBLISHED',
+                'specificContent': {
+                    'com.linkedin.ugc.ShareContent': {
+                        'shareCommentary': {
+                            'text': content
+                        },
+                        'shareMediaCategory': 'NONE'
+                    }
+                },
+                'visibility': {
+                    'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+                }
+            }
+            
+            response = requests.post(
+                'https://api.linkedin.com/v2/ugcPosts',
+                headers=headers,
+                json=data
+            )
+            
+            if response.status_code in [200, 201]:
+                post_id = response.headers.get('X-RestLi-Id')
+                logging.info(f"Personal post created successfully. Post ID: {post_id}")
+                return True
+            else:
+                logging.error(f"Personal posting failed: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            logging.error(f"Personal post creation failed: {e}")
+            return False
+    
+    def _get_person_urn(self):
+        """Get the person URN for personal posting."""
+        try:
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'LinkedIn-Version': '202410'
             }
             
             response = requests.get('https://api.linkedin.com/v2/people/~', headers=headers)
             
             if response.status_code == 200:
                 person_data = response.json()
-                return person_data.get('id', '')
+                person_id = person_data.get('id', '')
+                if person_id:
+                    return f'urn:li:person:{person_id}'
+                else:
+                    logging.error("No person ID found in profile response")
+                    return ''
             else:
-                logging.error(f"Failed to get person ID: {response.status_code}")
+                logging.error(f"Failed to get person profile: {response.status_code} - {response.text}")
                 return ''
                 
         except Exception as e:
-            logging.error(f"Error getting person ID: {e}")
+            logging.error(f"Error getting person URN: {e}")
             return ''
 
 if __name__ == "__main__":
